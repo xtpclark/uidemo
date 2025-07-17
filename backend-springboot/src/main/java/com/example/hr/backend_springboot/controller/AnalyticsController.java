@@ -69,12 +69,20 @@ public class AnalyticsController {
         return "analytics/department-stats";
     }
 
-    @GetMapping("/analytics/region-country")
-    public String employeesByRegionAndCountry(Model model) {
-        List<Object[]> rawResults = employeeRepository.findEmployeesByRegionAndCountryRaw();
-        model.addAttribute("regionData", rawResults);
-        return "analytics/region-country";
-    }
+@GetMapping("/analytics/region-country")
+public String employeesByRegionAndCountry(Model model) {
+    List<Object[]> rawResults = employeeRepository.findEmployeesByRegionAndCountryRaw();
+    
+    // Set up the model for the generic template
+    model.addAttribute("title", "Employees by Region & Country");
+    model.addAttribute("icon", "fa-globe");
+    model.addAttribute("description", "A breakdown of employee count and salary distribution across different geographical regions and countries.");
+    model.addAttribute("headers", List.of("Region", "Country", "Employee Count", "Total Salary", "Avg Salary"));
+    model.addAttribute("data", rawResults);
+
+    // Return the generic template view
+    return "analytics/generic-analytics";
+}
 
     @GetMapping("/analytics/job-mobility")
     public String employeeJobMobility(Model model) {
