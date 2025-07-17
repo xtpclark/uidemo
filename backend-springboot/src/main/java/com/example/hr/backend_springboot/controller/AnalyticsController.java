@@ -206,17 +206,30 @@ public class AnalyticsController {
         return "analytics/manager-workload";
     }
 
-    @GetMapping("/analytics/dashboard")
-    public String analyticsDashboard(Model model) {
-        // Get summary data for dashboard
-        List<Object[]> topEarners = employeeRepository.findTopEarnersByDepartmentRaw();
-        List<Object[]> deptStats = employeeRepository.findDepartmentStatsRaw();
-        List<Object[]> managerWorkload = employeeRepository.findManagerWorkloadRaw();
-        
-        model.addAttribute("topEarners", topEarners.subList(0, Math.min(5, topEarners.size())));
-        model.addAttribute("deptStats", deptStats);
-        model.addAttribute("managerWorkload", managerWorkload.subList(0, Math.min(3, managerWorkload.size())));
-        
-        return "analytics/dashboard";
+@GetMapping("/analytics/dashboard")
+public String analyticsDashboard(Model model) {
+    // Get summary data for dashboard
+    List<Object[]> rawTopEarners = employeeRepository.findTopEarnersByDepartmentRaw();
+    List<TopEarnerDTO> topEarners = new ArrayList<>();
+    for (Object[] row : rawTopEarners) {
+        topEarners.add(new TopEarnerDTO(
+            (String) row[0],
+            (String) row[1],
+            (BigDecimal) row[2],
+            (BigDecimal) row[3],
+            (BigDecimal) row[4]
+        ));
+    }
+
+    List<Object[]> deptStats = employeeRepository.findDepartmentStatsRaw();
+    List<Object[]> managerWorkload = employeeRepository.findManagerWorkloadRaw();
+
+    // Pass the mapped DTO list to the model
+    model.addAttribute("topEarners", topEarners.subList(0, Math.min(5, topEarners.size())));
+    model.addAttribute("deptStats", deptStats);
+    model.addAttribute("managerWorkload", managerWorkload);
+
+    return "analytics/dashboard";
+
     }
 } 
