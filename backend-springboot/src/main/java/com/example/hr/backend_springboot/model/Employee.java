@@ -1,18 +1,24 @@
 package com.example.hr.backend_springboot.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import jakarta.validation.constraints.*;
 
 @Entity
 @Table(name = "employees")
 public class Employee {
+
     @Id
     @Column(name = "employee_id")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "employees_seq")
+    @SequenceGenerator(name = "employees_seq", sequenceName = "EMPLOYEES_SEQ", allocationSize = 1)
     private Long employeeId;
 
     @Column(name = "first_name")
@@ -28,15 +34,15 @@ public class Employee {
     @NotBlank
     private String email;
 
+    // --- FIX: @NotBlank REMOVED TO MATCH DATABASE SCHEMA ---
     @Column(name = "phone_number")
-    @NotBlank
     private String phoneNumber;
 
     @Column(name = "hire_date")
     @NotNull
     private LocalDate hireDate;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "job_id")
     private Job job;
 
@@ -57,17 +63,17 @@ public class Employee {
     @JsonManagedReference
     private List<Employee> subordinates;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "department_id")
     private Department department;
 
+    // Getters and Setters
     public Long getEmployeeId() {
         return employeeId;
     }
     public void setEmployeeId(Long employeeId) {
         this.employeeId = employeeId;
     }
-
     public String getFirstName() {
         return firstName;
     }
@@ -134,4 +140,4 @@ public class Employee {
     public void setDepartment(Department department) {
         this.department = department;
     }
-} 
+}
