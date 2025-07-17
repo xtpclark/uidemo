@@ -25,5 +25,36 @@ public class Job {
     @DecimalMin("0.0")
     private BigDecimal maxSalary;
 
-    // Getters and setters omitted for brevity
+    public String getJobId() {
+        return jobId;
+    }
+
+    public void setJobId(String jobId) {
+        this.jobId = jobId;
+    }
+
+    public String getJobTitle() {
+        return jobTitle;
+    }
+
+    public void setJobTitle(String jobTitle) {
+        this.jobTitle = jobTitle;
+    }
+
+    public BigDecimal getMinSalary() {
+        return minSalary;
+    }
+
+    public void setMinSalary(BigDecimal minSalary) {
+        this.minSalary = minSalary;
+    }
+
+    public BigDecimal getMaxSalary() {
+        return maxSalary;
+    }
+
+    public void setMaxSalary(BigDecimal maxSalary) {
+        this.maxSalary = maxSalary;
+    }
+
 } 
