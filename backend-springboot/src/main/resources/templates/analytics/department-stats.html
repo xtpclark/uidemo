@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Department Salary Statistics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .stat-card {
+            border-left: 4px solid #007bff;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        .progress-custom {
+            height: 25px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/analytics/dashboard">
+                    <i class="fas fa-chart-line me-2"></i>HR Analytics
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="/analytics/dashboard">Dashboard</a>
+                    <a class="nav-link active" href="/analytics/department-stats">Department Stats</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="row">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h1><i class="fas fa-chart-bar text-primary me-2"></i>Department Salary Statistics</h1>
+                        <a href="/analytics/dashboard" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        This analysis shows salary statistics for departments with 5 or more employees, including average, median, min, max, and standard deviation.
+                    </div>
+
+                    <!-- Statistics Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card stat-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                                    <h4 th:text="${#lists.size(stats)}">0</h4>
+                                    <p class="text-muted">Departments Analyzed</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-dollar-sign fa-2x text-success mb-2"></i>
+                                    <h4 th:text="${stats != null and #lists.size(stats) > 0 ? '$' + #numbers.formatDecimal(stats[0].avgSalary, 1, 0) : '$0'}">$0</h4>
+                                    <p class="text-muted">Highest Avg Salary</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chart-line fa-2x text-warning mb-2"></i>
+                                    <h4 th:text="${stats != null and #lists.size(stats) > 0 ? #numbers.formatDecimal(stats[0].stddevSalary, 1, 0) : '0'}">0</h4>
+                                    <p class="text-muted">Highest Std Dev</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card stat-card">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-user-friends fa-2x text-info mb-2"></i>
+                                    <h4 th:text="${stats != null and #lists.size(stats) > 0 ? stats[0].employeeCount : 0}">0</h4>
+                                    <p class="text-muted">Largest Department</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Statistics Table -->
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-table me-2"></i>Detailed Department Statistics</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Employee Count</th>
+                                            <th>Avg Salary</th>
+                                            <th>Median Salary</th>
+                                            <th>Min Salary</th>
+                                            <th>Max Salary</th>
+                                            <th>Std Dev</th>
+                                            <th>Salary Range</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="stat : ${stats}">
+                                            <td>
+                                                <strong th:text="${stat.departmentName}">Department</strong>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary" th:text="${stat.employeeCount}">0</span>
+                                            </td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(stat.avgSalary, 1, 2)}">$0</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(stat.medianSalary, 1, 2)}">$0</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(stat.minSalary, 1, 2)}">$0</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(stat.maxSalary, 1, 2)}">$0</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(stat.stddevSalary, 1, 2)}">$0</td>
+                                            <td>
+                                                <div class="progress progress-custom">
+                                                    <div class="progress-bar bg-success" 
+                                                         th:style="'width: ' + ${(stat.maxSalary.doubleValue() - stat.minSalary.doubleValue()) / 20000 * 100} + '%'"
+                                                         th:text="${'$' + #numbers.formatDecimal(stat.maxSalary.subtract(stat.minSalary), 1, 0)}">
+                                                        $0
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Row -->
+                    <div class="row mt-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Average Salary by Department</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="avgSalaryChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Employee Count by Department</h6>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="employeeCountChart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Insights Row -->
+                    <div class="row mt-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h6 class="mb-0"><i class="fas fa-lightbulb me-2"></i>Key Insights</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled small">
+                                        <li th:if="${stats != null and #lists.size(stats) > 0}">
+                                            <i class="fas fa-trophy text-warning me-2"></i>
+                                            <strong th:text="${stats[0].departmentName}">Department</strong> has the highest average salary
+                                        </li>
+                                        <li th:if="${stats != null and #lists.size(stats) > 0}">
+                                            <i class="fas fa-users text-primary me-2"></i>
+                                            <strong th:text="${stats[0].departmentName}">Department</strong> has the most employees
+                                        </li>
+                                        <li th:if="${stats != null and #lists.size(stats) > 0}">
+                                            <i class="fas fa-chart-line text-info me-2"></i>
+                                            <strong th:text="${stats[0].departmentName}">Department</strong> has the highest salary variability
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    <h6 class="mb-0"><i class="fas fa-calculator me-2"></i>Salary Analysis</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <small class="text-muted">Salary Distribution:</small><br>
+                                        <div class="progress mb-1" style="height: 8px;">
+                                            <div class="progress-bar bg-success" style="width: 60%"></div>
+                                            <div class="progress-bar bg-warning" style="width: 30%"></div>
+                                            <div class="progress-bar bg-danger" style="width: 10%"></div>
+                                        </div>
+                                        <small>High | Medium | Low</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="mb-0"><i class="fas fa-chart-area me-2"></i>Trends</h6>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="list-unstyled small">
+                                        <li><i class="fas fa-arrow-up text-success me-2"></i>Salary ranges vary significantly</li>
+                                        <li><i class="fas fa-arrow-up text-success me-2"></i>Department sizes differ widely</li>
+                                        <li><i class="fas fa-arrow-up text-success me-2"></i>Standard deviations show pay dispersion</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        // Chart data from Thymeleaf
+        const stats = /*[[${stats}]]*/ [];
+        
+        if (stats && stats.length > 0) {
+            const labels = stats.map(stat => stat.departmentName);
+            const avgSalaries = stats.map(stat => stat.avgSalary);
+            const employeeCounts = stats.map(stat => stat.employeeCount);
+            
+            // Average Salary Chart
+            const avgSalaryCtx = document.getElementById('avgSalaryChart').getContext('2d');
+            new Chart(avgSalaryCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: avgSalaries,
+                        backgroundColor: [
+                            '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Employee Count Chart
+            const employeeCountCtx = document.getElementById('employeeCountChart').getContext('2d');
+            new Chart(employeeCountCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Employee Count',
+                        data: employeeCounts,
+                        backgroundColor: '#36A2EB'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<div th:fragment="body">
+<h2>Top Earners by Department</h2>
+<table border="1">
+    <tr>
+        <th>Department</th>
+        <th>Employee</th>
+        <th>Salary</th>
+        <th>Commission %</th>
+        <th>Total Compensation</th>
+    </tr>
+    <tr th:each="earner : ${topEarners}">
+        <td th:text="${earner.departmentName}"></td>
+        <td th:text="${earner.employeeName}"></td>
+        <td th:text="${earner.salary}"></td>
+        <td th:text="${earner.commissionPct}"></td>
+        <td th:text="${earner.totalCompensation}"></td>
+    </tr>
+</table>
+<p><a th:href="@{/analytics}">Back to Analytics</a></p>
+</div>
+</html> 

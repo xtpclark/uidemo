@@ -1,0 +1,8 @@
+<!DOCTYPE html>
+<div th:fragment="body">
+<h2>Department Details</h2>
+<p><b>ID:</b> <span th:text="${department.departmentId}"></span></p>
+<p><b>Name:</b> <span th:text="${department.departmentName}"></span></p>
+<p><a th:href="@{/departments}">Back to List</a></p>
+</div>
+</html> 

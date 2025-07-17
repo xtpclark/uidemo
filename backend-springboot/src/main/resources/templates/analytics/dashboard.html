@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>HR Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .analytics-card {
+            transition: transform 0.2s;
+            border-left: 4px solid #007bff;
+        }
+        .analytics-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+                    <div class="container-fluid">
+                        <a class="navbar-brand" href="/">
+                            <i class="fas fa-chart-line me-2"></i>HR Analytics Dashboard
+                        </a>
+                        <div class="navbar-nav ms-auto">
+                            <a class="nav-link" href="/employees">Employees</a>
+                            <a class="nav-link" href="/departments">Departments</a>
+                            <a class="nav-link active" href="/analytics/dashboard">Analytics</a>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        </div>
+
+        <div class="container mt-4">
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h1 class="display-4 text-center mb-4">
+                        <i class="fas fa-chart-pie text-primary"></i> HR Analytics Dashboard
+                    </h1>
+                    <p class="lead text-center text-muted">Comprehensive insights into your workforce data</p>
+                </div>
+            </div>
+
+            <!-- Quick Stats Row -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="stat-number" th:text="${#lists.size(topEarners)}">0</div>
+                        <div class="stat-label">Top Earners</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="stat-number" th:text="${#lists.size(deptStats)}">0</div>
+                        <div class="stat-label">Departments Analyzed</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="stat-number" th:text="${#lists.size(managerWorkload)}">0</div>
+                        <div class="stat-label">Active Managers</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card text-center">
+                        <div class="stat-number">20+</div>
+                        <div class="stat-label">Analytics Reports</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analytics Categories -->
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card analytics-card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-users me-2"></i>Employee Analytics</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><a href="/analytics/top-earners" class="text-decoration-none">
+                                    <i class="fas fa-trophy text-warning me-2"></i>Top Earners by Department
+                                </a></li>
+                                <li><a href="/analytics/employee-hierarchy" class="text-decoration-none">
+                                    <i class="fas fa-sitemap text-info me-2"></i>Organizational Hierarchy
+                                </a></li>
+                                <li><a href="/analytics/salary-percentiles" class="text-decoration-none">
+                                    <i class="fas fa-chart-bar text-success me-2"></i>Salary Percentile Analysis
+                                </a></li>
+                                <li><a href="/analytics/long-tenure-low-salary" class="text-decoration-none">
+                                    <i class="fas fa-exclamation-triangle text-warning me-2"></i>Long Tenure, Low Salary
+                                </a></li>
+                                <li><a href="/analytics/high-commission" class="text-decoration-none">
+                                    <i class="fas fa-percentage text-primary me-2"></i>High Commission Impact
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4 mb-4">
+                    <div class="card analytics-card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-building me-2"></i>Department Analytics</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><a href="/analytics/department-stats" class="text-decoration-none">
+                                    <i class="fas fa-chart-line text-primary me-2"></i>Department Statistics
+                                </a></li>
+                                <li><a href="/analytics/region-country" class="text-decoration-none">
+                                    <i class="fas fa-globe text-info me-2"></i>Employees by Region
+                                </a></li>
+                                <li><a href="/analytics/salary-budget" class="text-decoration-none">
+                                    <i class="fas fa-dollar-sign text-success me-2"></i>Salary Budget Allocation
+                                </a></li>
+                                <li><a href="/analytics/department-path" class="text-decoration-none">
+                                    <i class="fas fa-map-marker-alt text-warning me-2"></i>Department Locations
+                                </a></li>
+                                <li><a href="/analytics/diverse-job-roles" class="text-decoration-none">
+                                    <i class="fas fa-layer-group text-info me-2"></i>Diverse Job Roles
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4 mb-4">
+                    <div class="card analytics-card h-100">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-briefcase me-2"></i>Career & Management</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><a href="/analytics/job-mobility" class="text-decoration-none">
+                                    <i class="fas fa-exchange-alt text-primary me-2"></i>Job Mobility Analysis
+                                </a></li>
+                                <li><a href="/analytics/promotion-patterns" class="text-decoration-none">
+                                    <i class="fas fa-arrow-up text-success me-2"></i>Promotion Patterns
+                                </a></li>
+                                <li><a href="/analytics/manager-workload" class="text-decoration-none">
+                                    <i class="fas fa-user-tie text-warning me-2"></i>Manager Workload
+                                </a></li>
+                                <li><a href="/analytics/manager-salary-impact" class="text-decoration-none">
+                                    <i class="fas fa-chart-area text-info me-2"></i>Manager Salary Impact
+                                </a></li>
+                                <li><a href="/analytics/job-transitions" class="text-decoration-none">
+                                    <i class="fas fa-project-diagram text-primary me-2"></i>Job Transition Matrix
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Analytics -->
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card analytics-card h-100">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="mb-0"><i class="fas fa-history me-2"></i>Historical Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><a href="/analytics/employee-turnover" class="text-decoration-none">
+                                    <i class="fas fa-calendar-alt text-primary me-2"></i>Employee Turnover by Year
+                                </a></li>
+                                <li><a href="/analytics/hiring-trends" class="text-decoration-none">
+                                    <i class="fas fa-user-plus text-success me-2"></i>Departmental Hiring Trends
+                                </a></li>
+                                <li><a href="/analytics/no-recent-changes" class="text-decoration-none">
+                                    <i class="fas fa-pause-circle text-warning me-2"></i>Employees Without Recent Changes
+                                </a></li>
+                                <li><a href="/analytics/overlapping-jobs" class="text-decoration-none">
+                                    <i class="fas fa-exclamation-circle text-danger me-2"></i>Overlapping Job Assignments
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6 mb-4">
+                    <div class="card analytics-card h-100">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0"><i class="fas fa-cogs me-2"></i>Advanced Features</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li><a href="/analytics/job-roles-by-region" class="text-decoration-none">
+                                    <i class="fas fa-map text-info me-2"></i>Job Roles by Region
+                                </a></li>
+                                <li><a href="/employees" class="text-decoration-none">
+                                    <i class="fas fa-user-edit text-primary me-2"></i>Employee Management
+                                </a></li>
+                                <li><a href="/departments" class="text-decoration-none">
+                                    <i class="fas fa-building text-success me-2"></i>Department Management
+                                </a></li>
+                                <li><a href="/jobs" class="text-decoration-none">
+                                    <i class="fas fa-briefcase text-warning me-2"></i>Job Management
+                                </a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Top Earners Preview -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Recent Top Earners</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Employee</th>
+                                            <th>Salary</th>
+                                            <th>Commission %</th>
+                                            <th>Total Compensation</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr th:each="earner : ${topEarners}">
+                                            <td th:text="${earner.departmentName}">Department</td>
+                                            <td th:text="${earner.employeeName}">Employee</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(earner.salary, 1, 2)}">$0</td>
+                                            <td th:text="${earner.commissionPct != null ? #numbers.formatPercent(earner.commissionPct, 1, 2) : 'N/A'}">0%</td>
+                                            <td th:text="${'$' + #numbers.formatDecimal(earner.totalCompensation, 1, 2)}">$0</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

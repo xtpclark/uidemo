@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<div th:fragment="body">
+<h2>Employee Details</h2>
+<p><b>ID:</b> <span th:text="${employee.employeeId}"></span></p>
+<p><b>Name:</b> <span th:text="${employee.firstName + ' ' + employee.lastName}"></span></p>
+<p><b>Email:</b> <span th:text="${employee.email}"></span></p>
+<p><b>Phone:</b> <span th:text="${employee.phoneNumber}"></span></p>
+<p><b>Hire Date:</b> <span th:text="${employee.hireDate}"></span></p>
+<p><b>Department:</b> <span th:text="${employee.department != null ? employee.department.departmentName : ''}"></span></p>
+<p><b>Job:</b> <span th:text="${employee.job != null ? employee.job.jobTitle : ''}"></span></p>
+<p><b>Manager:</b> <span th:text="${employee.manager != null ? employee.manager.firstName + ' ' + employee.manager.lastName : ''}"></span></p>
+<p><b>Salary:</b> <span th:text="${employee.salary}"></span></p>
+<p><b>Commission %:</b> <span th:text="${employee.commissionPct}"></span></p>
+<p><a th:href="@{'/jobhistory/employee/' + ${employee.employeeId}}">View Job History</a></p>
+<p><a th:href="@{/employees}">Back to List</a></p>
+</div>
+</html> 
