@@ -1,22 +1,82 @@
 <!DOCTYPE html>
-<div th:fragment="body">
-<h2>Top Earners by Department</h2>
-<table border="1">
-    <tr>
-        <th>Department</th>
-        <th>Employee</th>
-        <th>Salary</th>
-        <th>Commission %</th>
-        <th>Total Compensation</th>
-    </tr>
-    <tr th:each="earner : ${topEarners}">
-        <td th:text="${earner.departmentName}"></td>
-        <td th:text="${earner.employeeName}"></td>
-        <td th:text="${earner.salary}"></td>
-        <td th:text="${earner.commissionPct}"></td>
-        <td th:text="${earner.totalCompensation}"></td>
-    </tr>
-</table>
-<p><a th:href="@{/analytics}">Back to Analytics</a></p>
-</div>
-</html> 
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Top Earners by Department - HR Analytics</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/analytics/dashboard">
+                <i class="fas fa-chart-line me-2"></i>HR Analytics
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/analytics/dashboard">Dashboard</a>
+                <a class="nav-link active" href="/analytics/top-earners">Top Earners</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-trophy text-warning me-2"></i>Top Earners by Department</h1>
+            <a href="/analytics/dashboard" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            This report shows the top 3 earners in each department, including salary and commission compensation.
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-table me-2"></i>Top Earners Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Department</th>
+                                <th>Employee</th>
+                                <th>Base Salary</th>
+                                <th>Commission %</th>
+                                <th>Total Compensation</th>
+                                <th>Rank</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="earner : ${topEarners}">
+                                <td>
+                                    <strong th:text="${earner.departmentName}">Sales</strong>
+                                </td>
+                                <td th:text="${earner.employeeName}">John Doe</td>
+                                <td th:text="${'$' + #numbers.formatDecimal(earner.salary, 1, 2)}">$10,000.00</td>
+                                <td>
+                                    <span class="badge" 
+                                          th:classappend="${earner.commissionPct != null and earner.commissionPct.doubleValue() > 0 ? 'bg-success' : 'bg-secondary'}"
+                                          th:text="${earner.commissionPct != null ? #numbers.formatPercent(earner.commissionPct, 1, 2) : 'N/A'}">
+                                        20%
+                                    </span>
+                                </td>
+                                <td>
+                                    <strong class="text-success" th:text="${'$' + #numbers.formatDecimal(earner.totalCompensation, 1, 2)}">$12,000.00</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning text-dark">#1</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
