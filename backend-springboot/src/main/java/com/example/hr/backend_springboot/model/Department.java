@@ -18,7 +18,7 @@ public class Department {
     @NotBlank
     private String departmentName;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER) // Changed from LAZY to EAGER
     @JoinColumn(name = "manager_id")
     private Employee manager;
 
