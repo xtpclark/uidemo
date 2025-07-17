@@ -10,11 +10,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.validation.BindingResult;
 import jakarta.validation.Valid;
 
 @Controller
@@ -28,7 +31,7 @@ public class EmployeeController {
     private JobRepository jobRepository;
 
     @GetMapping
-    public String listEmployees(Model model, Pageable pageable) {
+    public String listEmployees(Model model, @PageableDefault(size = 20) Pageable pageable) {
         Page<Employee> employees = employeeRepository.findAll(pageable);
         model.addAttribute("employees", employees);
         return "employee/list";
@@ -37,8 +40,12 @@ public class EmployeeController {
     @GetMapping("/view/{id}")
     public String viewEmployee(@PathVariable Long id, Model model) {
         Optional<Employee> employee = employeeRepository.findById(id);
-        model.addAttribute("employee", employee.orElse(null));
-        return "employee/view";
+        if (employee.isPresent()) {
+            model.addAttribute("employee", employee.get());
+            return "employee/view";
+        } else {
+            return "redirect:/employees";
+        }
     }
 
     @GetMapping("/add")
@@ -51,45 +58,125 @@ public class EmployeeController {
     }
 
     @PostMapping("/add")
-    public String addEmployee(@ModelAttribute @Valid Employee employee, @RequestParam Long department, @RequestParam String job, @RequestParam(required = false) Long manager) {
-        employee.setDepartment(departmentRepository.findById(department).orElse(null));
-        employee.setJob(jobRepository.findById(job).orElse(null));
-        if (manager != null) {
-            employee.setManager(employeeRepository.findById(manager).orElse(null));
-        } else {
-            employee.setManager(null);
+    public String addEmployee(@ModelAttribute @Valid Employee employee, 
+                            BindingResult result,
+                            @RequestParam(required = false) Long department, 
+                            @RequestParam(required = false) String job, 
+                            @RequestParam(required = false) Long manager,
+                            Model model,
+                            RedirectAttributes redirectAttributes) {
+        
+        if (result.hasErrors()) {
+            model.addAttribute("departments", departmentRepository.findAll());
+            model.addAttribute("jobs", jobRepository.findAll());
+            model.addAttribute("managers", employeeRepository.findAll());
+            return "employee/add";
         }
-        employeeRepository.save(employee);
-        return "redirect:/employees";
+        
+        try {
+            if (department != null) {
+                employee.setDepartment(departmentRepository.findById(department).orElse(null));
+            }
+            if (job != null) {
+                employee.setJob(jobRepository.findById(job).orElse(null));
+            }
+            if (manager != null) {
+                employee.setManager(employeeRepository.findById(manager).orElse(null));
+            }
+            
+            employeeRepository.save(employee);
+            redirectAttributes.addFlashAttribute("successMessage", "Employee added successfully!");
+            return "redirect:/employees";
+        } catch (Exception e) {
+            model.addAttribute("errorMessage", "Error saving employee: " + e.getMessage());
+            model.addAttribute("departments", departmentRepository.findAll());
+            model.addAttribute("jobs", jobRepository.findAll());
+            model.addAttribute("managers", employeeRepository.findAll());
+            return "employee/add";
+        }
     }
 
     @GetMapping("/edit/{id}")
     public String editEmployeeForm(@PathVariable Long id, Model model) {
         Optional<Employee> employee = employeeRepository.findById(id);
-        model.addAttribute("employee", employee.orElse(null));
-        model.addAttribute("departments", departmentRepository.findAll());
-        model.addAttribute("jobs", jobRepository.findAll());
-        model.addAttribute("managers", employeeRepository.findAll());
-        return "employee/edit";
+        if (employee.isPresent()) {
+            model.addAttribute("employee", employee.get());
+            model.addAttribute("departments", departmentRepository.findAll());
+            model.addAttribute("jobs", jobRepository.findAll());
+            model.addAttribute("managers", employeeRepository.findAll());
+            return "employee/edit";
+        } else {
+            return "redirect:/employees";
+        }
     }
 
     @PostMapping("/edit/{id}")
-    public String editEmployee(@PathVariable Long id, @ModelAttribute @Valid Employee employee, @RequestParam Long department, @RequestParam String job, @RequestParam(required = false) Long manager) {
-        employee.setEmployeeId(id);
-        employee.setDepartment(departmentRepository.findById(department).orElse(null));
-        employee.setJob(jobRepository.findById(job).orElse(null));
-        if (manager != null) {
-            employee.setManager(employeeRepository.findById(manager).orElse(null));
-        } else {
-            employee.setManager(null);
+    public String editEmployee(@PathVariable Long id, 
+                             @ModelAttribute @Valid Employee employee, 
+                             BindingResult result,
+                             @RequestParam(required = false) Long department, 
+                             @RequestParam(required = false) String job, 
+                             @RequestParam(required = false) Long manager,
+                             Model model,
+                             RedirectAttributes redirectAttributes) {
+        
+        if (result.hasErrors()) {
+            model.addAttribute("departments", departmentRepository.findAll());
+            model.addAttribute("jobs", jobRepository.findAll());
+            model.addAttribute("managers", employeeRepository.findAll());
+            return "employee/edit";
         }
-        employeeRepository.save(employee);
-        return "redirect:/employees";
+        
+        try {
+            // Ensure we're updating the existing employee
+            Optional<Employee> existingEmployee = employeeRepository.findById(id);
+            if (existingEmployee.isPresent()) {
+                Employee empToUpdate = existingEmployee.get();
+                
+                // Update fields
+                empToUpdate.setFirstName(employee.getFirstName());
+                empToUpdate.setLastName(employee.getLastName());
+                empToUpdate.setEmail(employee.getEmail());
+                empToUpdate.setPhoneNumber(employee.getPhoneNumber());
+                empToUpdate.setHireDate(employee.getHireDate());
+                empToUpdate.setSalary(employee.getSalary());
+                empToUpdate.setCommissionPct(employee.getCommissionPct());
+                
+                if (department != null) {
+                    empToUpdate.setDepartment(departmentRepository.findById(department).orElse(null));
+                }
+                if (job != null) {
+                    empToUpdate.setJob(jobRepository.findById(job).orElse(null));
+                }
+                if (manager != null) {
+                    empToUpdate.setManager(employeeRepository.findById(manager).orElse(null));
+                } else {
+                    empToUpdate.setManager(null);
+                }
+                
+                employeeRepository.save(empToUpdate);
+                redirectAttributes.addFlashAttribute("successMessage", "Employee updated successfully!");
+                return "redirect:/employees";
+            } else {
+                return "redirect:/employees";
+            }
+        } catch (Exception e) {
+            model.addAttribute("errorMessage", "Error updating employee: " + e.getMessage());
+            model.addAttribute("departments", departmentRepository.findAll());
+            model.addAttribute("jobs", jobRepository.findAll());
+            model.addAttribute("managers", employeeRepository.findAll());
+            return "employee/edit";
+        }
     }
 
     @GetMapping("/delete/{id}")
-    public String deleteEmployee(@PathVariable Long id) {
-        employeeRepository.deleteById(id);
+    public String deleteEmployee(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+        try {
+            employeeRepository.deleteById(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Employee deleted successfully!");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("errorMessage", "Error deleting employee: " + e.getMessage());
+        }
         return "redirect:/employees";
     }
-} 
+}
