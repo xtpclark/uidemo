@@ -1,0 +1,244 @@
+= Adding a New Analytics Dashboard to a Spring Boot Application
+
+This tutorial walks through the process of adding a new analytics dashboard to the Spring Boot HR Management Demo application. Specifically, we will implement the "Employees with Long Tenure and Low Salary" query.
+
+== How Spring Boot Executes "Invisible" Queries
+
+A key feature of the Spring Data JPA is its ability to execute database queries from repository interfaces without requiring you to write the implementation. This can seem like magic, but it's a powerful feature of the framework.
+
+Here's how it works:
+
+1.  **Repository Interface**: You define a Java interface that extends one of the Spring Data JPA repository interfaces, like `JpaRepository`. In this application, that file is `EmployeeRepository.java`.
+
+2.  **`@Query` Annotation**: You declare a method in your interface and annotate it with `@Query`. This annotation contains the native SQL query to be executed. You also set the `nativeQuery` attribute to `true` to tell Spring Data JPA to execute the query as plain SQL.
+
+3.  **Dynamic Proxy**: When the application starts, Spring Data JPA scans for interfaces that extend its `Repository` interfaces. For each interface it finds, it creates a dynamic proxy object that implements the interface. This proxy is a real Java object that is generated at runtime.
+
+4.  **Method Invocation**: When you call a method on your repository interface (e.g., `employeeRepository.findLongTenureLowSalaryRaw()`), you are actually calling a method on the proxy object. The proxy intercepts this call, takes the SQL from the `@Query` annotation, and executes it against the database. The results are then mapped to the return type you specified in the interface's method signature.
+
+This is why you don't see the "physical" query in your code. Spring Boot and Spring Data JPA handle the implementation for you, allowing you to focus on the data access logic and keeping your code clean and concise.
+
+---
+
+== Step-by-Step Guide to Adding the New Dashboard
+
+Now, let's add the "Employees with Long Tenure and Low Salary" dashboard to the application.
+
+=== Step 1: Create the Data Transfer Object (DTO)
+
+First, create a new DTO to hold the results of our query.
+
+Create a new file named `LongTenureLowSalaryDTO.java` in `src/main/java/com/example/hr/backend_springboot/dto/`:
+
+[source,java]
+----
+package com.example.hr.backend_springboot.dto;
+
+import java.math.BigDecimal;
+
+public class LongTenureLowSalaryDTO {
+    private Long employeeId;
+    private String employeeName;
+    private String jobTitle;
+    private BigDecimal salary;
+    private BigDecimal medianSalary;
+    private BigDecimal yearsOfService;
+
+    public LongTenureLowSalaryDTO(Number employeeId, String employeeName, String jobTitle, BigDecimal salary, BigDecimal medianSalary, BigDecimal yearsOfService) {
+        this.employeeId = employeeId.longValue();
+        this.employeeName = employeeName;
+        this.jobTitle = jobTitle;
+        this.salary = salary;
+        this.medianSalary = medianSalary;
+        this.yearsOfService = yearsOfService;
+    }
+
+    // Getters and setters...
+}
+----
+
+=== Step 2: Update the Employee Repository
+
+Next, add the new query to the `EmployeeRepository.java` interface. This query is taken directly from the `sample_queries.txt` file.
+
+[source,java]
+----
+package com.example.hr.backend_springboot.repository;
+
+import com.example.hr.backend_springboot.model.Employee;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import java.util.List;
+
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+
+    // ... (other existing queries)
+
+    @Query(value = "WITH JobMedian AS (" +
+            "    SELECT " +
+            "        job_id," +
+            "        MEDIAN(salary) AS median_salary" +
+            "    FROM employees" +
+            "    GROUP BY job_id" +
+            ")" +
+            "SELECT " +
+            "    e.employee_id," +
+            "    e.first_name || ' ' || e.last_name AS employee_name," +
+            "    j.job_title," +
+            "    e.salary," +
+            "    jm.median_salary," +
+            "    ROUND(MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12, 2) AS years_of_service" +
+            " FROM employees e" +
+            " JOIN jobs j ON e.job_id = j.job_id" +
+            " JOIN JobMedian jm ON e.job_id = jm.job_id" +
+            " WHERE MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12 > 5" +
+            " AND e.salary <= jm.median_salary" +
+            " ORDER BY years_of_service DESC, salary",
+            nativeQuery = true)
+    List<Object[]> findLongTenureLowSalaryRaw();
+
+}
+----
+
+=== Step 3: Update the Analytics Controller
+
+Now, add a new request mapping to the `AnalyticsController.java` file to handle requests for the new dashboard.
+
+[source,java]
+----
+package com.example.hr.backend_springboot.controller;
+
+import com.example.hr.backend_springboot.dto.*;
+import com.example.hr.backend_springboot.repository.EmployeeRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+@Controller
+public class AnalyticsController {
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    // ... (other existing GET mappings)
+
+    @GetMapping("/analytics/long-tenure-low-salary")
+    public String longTenureLowSalary(Model model) {
+        List<Object[]> rawResults = employeeRepository.findLongTenureLowSalaryRaw();
+        List<LongTenureLowSalaryDTO> tenureData = new ArrayList<>();
+        for (Object[] row : rawResults) {
+            tenureData.add(new LongTenureLowSalaryDTO(
+                (Number) row[0],
+                (String) row[1],
+                (String) row[2],
+                (BigDecimal) row[3],
+                (BigDecimal) row[4],
+                (BigDecimal) row[5]
+            ));
+        }
+        model.addAttribute("tenureData", tenureData);
+        return "analytics/long-tenure-low-salary";
+    }
+}
+----
+
+=== Step 4: Create the HTML View
+
+Create a new Thymeleaf template to display the results.
+
+Create a file named `long-tenure-low-salary.html` in `src/main/resources/templates/analytics/`:
+
+[source,html]
+----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Long Tenure & Low Salary</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/analytics/dashboard">
+                    <i class="fas fa-chart-line me-2"></i>HR Analytics
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="/analytics/dashboard">Dashboard</a>
+                    <a class="nav-link active" href="/analytics/long-tenure-low-salary">Long Tenure</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-exclamation-triangle text-warning me-2"></i>Employees with Long Tenure and Low Salary</h1>
+                <a href="/analytics/dashboard" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="fas fa-info-circle me-2"></i>
+                This report flags employees with over 5 years of service whose salaries are at or below the median for their job role.
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Retention Risk Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Employee ID</th>
+                                    <th>Employee Name</th>
+                                    <th>Job Title</th>
+                                    <th>Salary</th>
+                                    <th>Median Salary for Job</th>
+                                    <th>Years of Service</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="employee : ${tenureData}">
+                                    <td th:text="${employee.employeeId}"></td>
+                                    <td th:text="${employee.employeeName}"></td>
+                                    <td th:text="${employee.jobTitle}"></td>
+                                    <td th:text="${'$' + #numbers.formatDecimal(employee.salary, 1, 2)}"></td>
+                                    <td th:text="${'$' + #numbers.formatDecimal(employee.medianSalary, 1, 2)}"></td>
+                                    <td th:text="${#numbers.formatDecimal(employee.yearsOfService, 1, 2)}"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+----
+
+=== Step 5: Update the Analytics Dashboard
+
+Finally, add a link to the new report on the main analytics dashboard.
+
+Open `src/main/resources/templates/analytics/dashboard.html` and add the following line to the "Employee Analytics" card:
+
+[source,html]
+----
+<li><a href="/analytics/long-tenure-low-salary" class="text-decoration-none">
+    <i class="fas fa-exclamation-triangle text-warning me-2"></i>Long Tenure, Low Salary
+</a></li>
+----
+
+Once you've completed these steps, you can rebuild and run your application. You will find a link to your new dashboard on the main analytics page.

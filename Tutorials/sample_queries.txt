@@ -1,0 +1,911 @@
+= Advanced Oracle SQL Queries for HR Schema
+
+Collection of complex Oracle SQL queries for the HR schema, demonstrating various analytical and reporting capabilities. Each query includes a description, purpose, SQL code, and sample expected results based on the populated HR schema data.
+
+== Query 1: Top Earners by Department with Commission Impact
+
+*Description*: Identifies the top 3 highest-paid employees in each department, factoring in their commission (if applicable), to evaluate compensation distribution.
+
+*Purpose*: To rank employees by total compensation within each department.
+
+*SQL*:
+```sql
+WITH EmployeeCompensation AS (
+    SELECT 
+        e.employee_id,
+        e.first_name || ' ' || e.last_name AS employee_name,
+        d.department_name,
+        e.salary,
+        COALESCE(e.commission_pct, 0) AS commission_pct,
+        e.salary * (1 + COALESCE(e.commission_pct, 0)) AS total_compensation,
+        ROW_NUMBER() OVER (PARTITION BY e.department_id ORDER BY e.salary * (1 + COALESCE(e.commission_pct, 0)) DESC) AS rank
+    FROM employees e
+    JOIN departments d ON e.department_id = d.department_id
+    WHERE e.department_id IS NOT NULL
+)
+SELECT 
+    department_name,
+    employee_name,
+    salary,
+    commission_pct,
+    total_compensation
+FROM EmployeeCompensation
+WHERE rank <= 3
+ORDER BY department_name, total_compensation DESC;
+```
+
+*Expected Results*:
+|===
+|department_name|employee_name|salary|commission_pct|total_compensation
+|Executive|Steven King|24000|0|24000
+|Executive|Neena Yang|17000|0|17000
+|===
+
+== Query 2: Manager-Employee Reporting Structure
+
+*Description*: Displays the hierarchical reporting structure starting from the top executive (employee with no manager) down to all employees.
+
+*Purpose*: To visualize the organizational hierarchy and reporting lines.
+
+*SQL*:
+```sql
+SELECT 
+    LEVEL AS hierarchy_level,
+    LPAD(' ', 2 * (LEVEL - 1)) || first_name || ' ' || last_name AS employee_name,
+    job_title,
+    department_name,
+    salary
+FROM employees e
+JOIN jobs j ON e.job_id = j.job_id
+JOIN departments d ON e.department_id = d.department_id
+START WITH e.manager_id IS NULL
+CONNECT BY PRIOR e.employee_id = e.manager_id
+ORDER SIBLINGS BY e.last_name, e.first_name;
+```
+
+*Expected Results*:
+|===
+|hierarchy_level|employee_name|job_title|department_name|salary
+|1|Steven King|President|Executive|24000
+|2|Lex Garcia|Administration Vice President|Executive|17000
+|===
+
+== Query 3: Departmental Salary Statistics
+
+*Description*: Provides salary statistics (average, median, min, max, standard deviation) for departments with 5 or more employees.
+
+*Purpose*: To summarize salary distribution and variability by department.
+
+*SQL*:
+```sql
+WITH DeptStats AS (
+    SELECT 
+        d.department_name,
+        COUNT(e.employee_id) AS employee_count,
+        AVG(e.salary) AS avg_salary,
+        MEDIAN(e.salary) AS median_salary,
+        MIN(e.salary) AS min_salary,
+        MAX(e.salary) AS max_salary,
+        STDDEV(e.salary) AS stddev_salary
+    FROM employees e
+    JOIN departments d ON e.department_id = d.department_id
+    GROUP BY d.department_name
+    HAVING COUNT(e.employee_id) >= 5
+)
+SELECT 
+    department_name,
+    employee_count,
+    ROUND(avg_salary, 2) AS avg_salary,
+    ROUND(median_salary, 2) AS median_salary,
+    min_salary,
+    max_salary,
+    ROUND(stddev_salary, 2) AS stddev_salary
+FROM DeptStats
+ORDER BY avg_salary DESC;
+```
+
+*Expected Results*:
+|===
+|department_name|employee_count|avg_salary|median_salary|min_salary|max_salary|stddev_salary
+|Sales|34|8955.88|8800|6100|14000|2407.03
+|Finance|6|8484.67|8000|6900|12008|1716.06
+|===
+
+== Query 4: Employees by Region and Country
+
+*Description*: Summarizes the number of employees and total salary by region and country, with subtotals for regions.
+
+*Purpose*: To analyze workforce distribution across geographic regions.
+
+*SQL*:
+```sql
+SELECT 
+    r.region_name,
+    c.country_name,
+    COUNT(e.employee_id) AS employee_count,
+    ROUND(SUM(e.salary), 2) AS total_salary,
+    ROUND(AVG(e.salary), 2) AS avg_salary_per_employee
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+JOIN locations l ON d.location_id = l.location_id
+JOIN countries c ON l.country_id = c.country_id
+JOIN regions r ON c.region_id = r.region_id
+GROUP BY ROLLUP(r.region_name, c.country_name)
+ORDER BY r.region_name, c.country_name;
+```
+
+*Expected Results*:
+|===
+|region_name|country_name|employee_count|total_salary|avg_salary_per_employee
+|Americas|Canada|2|19000|9500
+|Americas|United States|68|356258|5242.03
+|===
+
+== Query 5: Employee Job Mobility
+
+*Description*: Identifies employees who have held multiple roles and calculates their average tenure per role.
+
+*Purpose*: To analyze career progression and role changes within the company.
+
+*SQL*:
+```sql
+WITH JobTenure AS (
+    SELECT 
+        e.employee_id,
+        e.first_name || ' ' || e.last_name AS employee_name,
+        COUNT(jh.job_id) AS role_count,
+        AVG(MONTHS_BETWEEN(jh.end_date, jh.start_date)) AS avg_months_per_role
+    FROM employees e
+    JOIN job_history jh ON e.employee_id = jh.employee_id
+    GROUP BY e.employee_id, e.first_name, e.last_name
+    HAVING COUNT(jh.job_id) > 1
+)
+SELECT 
+    employee_name,
+    role_count,
+    ROUND(avg_months_per_role, 2) AS avg_months_per_role,
+    LISTAGG(j.job_title, ', ') WITHIN GROUP (ORDER BY jh.start_date) AS job_titles
+FROM JobTenure jt
+JOIN job_history jh ON jt.employee_id = jh.employee_id
+JOIN jobs j ON jh.job_id = j.job_id
+GROUP BY employee_name, role_count, avg_months_per_role
+ORDER BY role_count DESC, avg_months_per_role;
+```
+
+*Expected Results*:
+|===
+|employee_name|role_count|avg_months_per_role|job_titles
+|Neena Yang|2|50.5|Public Accountant, Accounting Manager
+|Jonathon Taylor|2|10.62|Sales Representative, Sales Manager
+|===
+
+== Query 6: Employee Salary Growth Under Managers
+
+*Description*: Compares the average salary of employees under each manager to the department average.
+
+*Purpose*: To evaluate manager impact on team compensation.
+
+*SQL*:
+```sql
+WITH ManagerStats AS (
+    SELECT 
+        m.employee_id AS manager_id,
+        m.first_name || ' ' || m.last_name AS manager_name,
+        d.department_name,
+        AVG(e.salary) AS avg_team_salary,
+        (SELECT AVG(salary) FROM employees WHERE department_id = d.department_id) AS dept_avg_salary
+    FROM employees e
+    JOIN employees m ON e.manager_id = m.employee_id
+    JOIN departments d ON e.department_id = d.department_id
+    GROUP BY m.employee_id, m.first_name, m.last_name, d.department_name, d.department_id
+)
+SELECT 
+    manager_name,
+    department_name,
+    ROUND(avg_team_salary, 2) AS avg_team_salary,
+    ROUND(dept_avg_salary, 2) AS dept_avg_salary,
+    ROUND(((avg_team_salary - dept_avg_salary) / dept_avg_salary * 100), 2) AS pct_diff
+FROM ManagerStats
+WHERE avg_team_salary IS NOT NULL
+ORDER BY department_name, pct_diff DESC;
+```
+
+*Expected Results*:
+|===
+|manager_name|department_name|avg_team_salary|dept_avg_salary|pct_diff
+|John Singh|Sales|8600|8955.88|-3.98
+|Karen Partners|Sales|8500|8955.88|-5.09
+|===
+
+== Query 7: Employees with Long Tenure and Low Salary
+
+*Description*: Flags employees with over 5 years of service (as of June 11, 2025) and salaries at or below the median for their job role.
+
+*Purpose*: To identify potential retention risks due to low compensation.
+
+*SQL*:
+```sql
+WITH JobMedian AS (
+    SELECT 
+        job_id,
+        MEDIAN(salary) AS median_salary
+    FROM employees
+    GROUP BY job_id
+)
+SELECT 
+    e.employee_id,
+    e.first_name || ' ' || e.last_name AS employee_name,
+    j.job_title,
+    e.salary,
+    jm.median_salary,
+    ROUND(MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12, 2) AS years_of_service
+FROM employees e
+JOIN jobs j ON e.job_id = j.job_id
+JOIN JobMedian jm ON e.job_id = jm.job_id
+WHERE MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12 > 5
+AND e.salary <= jm.median_salary
+ORDER BY years_of_service DESC, salary;
+```
+
+*Expected Results*:
+|===
+|employee_id|employee_name|job_title|salary|median_salary|years_of_service
+|203|Susan Jacobs|Human Resources Representative|6500|6500|13.01
+|204|Hermann Brown|Public Relations Representative|10000|10000|13.01
+|===
+
+== Query 8: Employee Promotion Patterns
+
+*Description*: Analyzes employees who have been promoted (changed to a higher-paying job role) based on job history, showing salary increase percentages.
+
+*Purpose*: To track promotion trends and their financial impact.
+
+*SQL*:
+```sql
+WITH JobChanges AS (
+    SELECT 
+        jh.employee_id,
+        e.first_name || ' ' || e.last_name AS employee_name,
+        jh.job_id AS new_job_id,
+        j.job_title AS new_job_title,
+        LAG(jh.job_id) OVER (PARTITION BY jh.employee_id ORDER BY jh.start_date) AS prev_job_id,
+        LAG(j.job_title) OVER (PARTITION BY jh.employee_id ORDER BY jh.start_date) AS prev_job_title,
+        j.max_salary AS new_max_salary,
+        LAG(j.max_salary) OVER (PARTITION BY jh.employee_id ORDER BY jh.start_date) AS prev_max_salary
+    FROM job_history jh
+    JOIN employees e ON jh.employee_id = e.employee_id
+    JOIN jobs j ON jh.job_id = j.job_id
+)
+SELECT 
+    employee_name,
+    prev_job_title,
+    new_job_title,
+    prev_max_salary,
+    new_max_salary,
+    ROUND(((new_max_salary - prev_max_salary) / prev_max_salary * 100), 2) AS salary_increase_pct
+FROM JobChanges
+WHERE prev_job_id IS NOT NULL
+AND new_max_salary > prev_max_salary
+ORDER BY salary_increase_pct DESC;
+```
+
+*Expected Results*:
+|===
+|employee_name|prev_job_title|new_job_title|prev_max_salary|new_max_salary|salary_increase_pct
+|Neena Yang|Public Accountant|Accounting Manager|9000|16000|77.78
+|Jonathon Taylor|Sales Representative|Sales Manager|12008|20080|67.22
+|===
+
+== Query 9: Overlapping Job Assignments
+
+*Description*: Identifies employees with overlapping job assignments in the job history, where the start date of a new role is before the end date of a previous role.
+
+*Purpose*: To detect potential data inconsistencies or scheduling conflicts in job history records.
+
+*SQL*:
+```sql
+SELECT 
+    e.employee_id,
+    e.first_name || ' ' || e.last_name AS employee_name,
+    jh1.job_id AS job1_id,
+    j1.job_title AS job1_title,
+    jh1.start_date AS job1_start,
+    jh1.end_date AS job1_end,
+    jh2.job_id AS job2_id,
+    j2.job_title AS job2_title,
+    jh2.start_date AS job2_start,
+    jh2.end_date AS job2_end
+FROM job_history jh1
+JOIN job_history jh2 ON jh1.employee_id = jh2.employee_id
+JOIN employees e ON jh1.employee_id = e.employee_id
+JOIN jobs j1 ON jh1.job_id = j1.job_id
+JOIN jobs j2 ON jh2.job_id = j2.job_id
+WHERE jh1.start_date < jh2.start_date
+AND jh1.end_date >= jh2.start_date
+AND jh1.start_date != jh2.start_date;
+```
+
+*Expected Results*:
+|===
+|employee_id|employee_name|job1_id|job1_title|job1_start|job1_end|job2_id|job2_title|job2_start|job2_end
+|101|Neena Yang|AC_ACCOUNT|Public Accountant|2007-09-21|2011-10-27|AC_MGR|Accounting Manager|2011-10-28|2015-03-15
+|176|Jonathon Taylor|SA_REP|Sales Representative|2016-03-24|2016-12-31|SA_MAN|Sales Manager|2017-01-01|2017-12-31
+|===
+
+== Query 10: Unique Job Roles Across Regions
+
+*Description*: Lists unique job roles performed in each region, using set operations to combine current and historical job assignments.
+
+*Purpose*: To identify the diversity of job functions across geographic regions.
+
+*SQL*:
+```sql
+WITH CurrentJobs AS (
+    SELECT DISTINCT 
+        r.region_name,
+        j.job_title
+    FROM employees e
+    JOIN departments d ON e.department_id = d.department_id
+    JOIN locations l ON d.location_id = l.location_id
+    JOIN countries c ON l.country_id = c.country_id
+    JOIN regions r ON c.region_id = r.region_id
+    JOIN jobs j ON e.job_id = j.job_id
+    WHERE e.department_id IS NOT NULL
+),
+HistoricalJobs AS (
+    SELECT DISTINCT 
+        r.region_name,
+        j.job_title
+    FROM job_history jh
+    JOIN employees e ON jh.employee_id = e.employee_id
+    JOIN departments d ON jh.department_id = d.department_id
+    JOIN locations l ON d.location_id = l.location_id
+    JOIN countries c ON l.country_id = c.country_id
+    JOIN regions r ON c.region_id = r.region_id
+    JOIN jobs j ON jh.job_id = j.job_id
+)
+SELECT region_name, job_title
+FROM CurrentJobs
+UNION
+SELECT region_name, job_title
+FROM HistoricalJobs
+ORDER BY region_name, job_title;
+```
+
+*Expected Results*:
+|===
+|region_name|job_title
+|Americas|Accountant
+|Americas|Accounting Manager
+|===
+
+== Query 11: Employee Turnover by Year
+
+*Description*: Calculates the number of employees who left their roles (based on job_history end dates) by year, highlighting turnover trends.
+
+*Purpose*: To analyze historical employee turnover patterns.
+
+*SQL*:
+```sql
+SELECT 
+    EXTRACT(YEAR FROM end_date) AS turnover_year,
+    COUNT(*) AS turnover_count
+FROM job_history
+GROUP BY EXTRACT(YEAR FROM end_date)
+ORDER BY turnover_year;
+```
+
+*Expected Results*:
+|===
+|turnover_year|turnover_count
+|2011|2
+|2015|1
+|===
+
+== Query 12: Departmental Hiring Trends
+
+*Description*: Summarizes the number of hires per department by year, based on employee hire dates.
+
+*Purpose*: To track recruitment activity over time.
+
+*SQL*:
+```sql
+SELECT 
+    d.department_name,
+    EXTRACT(YEAR FROM e.hire_date) AS hire_year,
+    COUNT(e.employee_id) AS hire_count
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+GROUP BY d.department_name, EXTRACT(YEAR FROM e.hire_date)
+ORDER BY d.department_name, hire_year;
+```
+
+*Expected Results*:
+|===
+|department_name|hire_year|hire_count
+|Accounting|2012|2
+|Administration|2013|1
+|===
+
+== Query 13: Salary Percentile Analysis
+
+*Description*: Assigns each employee a salary percentile within their department, using window functions to identify relative compensation levels.
+
+*Purpose*: To evaluate how employees' salaries compare within their departments.
+
+*SQL*:
+```sql
+SELECT 
+    d.department_name,
+    e.first_name || ' ' || e.last_name AS employee_name,
+    e.salary,
+    ROUND(PERCENT_RANK() OVER (PARTITION BY e.department_id ORDER BY e.salary) * 100, 2) AS salary_percentile
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+WHERE e.department_id IS NOT NULL
+ORDER BY d.department_name, salary_percentile DESC;
+```
+
+*Expected Results*:
+|===
+|department_name|employee_name|salary|salary_percentile
+|Accounting|Shelley Higgins|12008|100
+|Accounting|William Gietz|8300|0
+|===
+
+== Query 14: Employees Without Recent Role Changes
+
+*Description*: Identifies employees who have not changed roles (no job_history entries) in the last 5 years, indicating potential stagnation.
+
+*Purpose*: To flag employees who may need career development opportunities.
+
+*SQL*:
+```sql
+SELECT 
+    e.employee_id,
+    e.first_name || ' ' || e.last_name AS employee_name,
+    j.job_title,
+    e.hire_date,
+    ROUND(MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12, 2) AS years_of_service
+FROM employees e
+JOIN jobs j ON e.job_id = j.job_id
+LEFT JOIN job_history jh ON e.employee_id = jh.employee_id
+WHERE jh.employee_id IS NULL
+AND MONTHS_BETWEEN(SYSDATE, e.hire_date) / 12 > 5
+ORDER BY years_of_service DESC;
+```
+
+*Expected Results*:
+|===
+|employee_id|employee_name|job_title|hire_date|years_of_service
+|100|Steven King|President|2013-06-17|11.99
+|200|Jennifer Whalen|Administration Assistant|2013-09-17|11.73
+|===
+
+== Query 15: Departmental Salary Budget Allocation
+
+*Description*: Pivots salary totals by department for each region, showing budget distribution across geographic areas.
+
+*Purpose*: To analyze how salary budgets are allocated by department and region.
+
+*SQL*:
+```sql
+SELECT *
+FROM (
+    SELECT 
+        r.region_name,
+        d.department_name,
+        SUM(e.salary) AS total_salary
+    FROM employees e
+    JOIN departments d ON e.department_id = d.department_id
+    JOIN locations l ON d.location_id = l.location_id
+    JOIN countries c ON l.country_id = c.country_id
+    JOIN regions r ON c.region_id = r.region_id
+    GROUP BY r.region_name, d.department_name
+)
+PIVOT (
+    SUM(total_salary)
+    FOR department_name IN (
+        'Executive' AS Executive,
+        'Sales' AS Sales,
+        'Finance' AS Finance
+    )
+)
+ORDER BY region_name;
+```
+
+*Expected Results*:
+|===
+|region_name|Executive|Sales|Finance
+|Americas|58000|NULL|50908
+|Europe|NULL|308350|NULL
+|===
+
+== Query 16: Recursive Department Path
+
+*Description*: Uses a recursive CTE to build the full location path (region → country → city) for each department.
+
+*Purpose*: To provide a hierarchical view of department locations.
+
+*SQL*:
+```sql
+WITH LocationPath (department_id, department_name, location_path, location_id, country_id, region_id, recursion_level) AS (
+    -- Anchor member: Start with departments and their city
+    SELECT 
+        d.department_id,
+        d.department_name,
+        l.city AS location_path,
+        l.location_id,
+        l.country_id,
+        c.region_id,
+        1 AS recursion_level
+    FROM departments d
+    JOIN locations l ON d.location_id = l.location_id
+    JOIN countries c ON l.country_id = c.country_id
+    UNION ALL
+    -- Recursive member: Append country and region names
+    SELECT 
+        lp.department_id,
+        lp.department_name,
+        CASE 
+            WHEN lp.recursion_level = 1 THEN c.country_name || ' → ' || lp.location_path
+            WHEN lp.recursion_level = 2 THEN r.region_name || ' → ' || lp.location_path
+        END AS location_path,
+        lp.location_id,
+        lp.country_id,
+        lp.region_id,
+        lp.recursion_level + 1
+    FROM LocationPath lp
+    LEFT JOIN countries c ON lp.country_id = c.country_id AND lp.recursion_level = 1
+    LEFT JOIN regions r ON lp.region_id = r.region_id AND lp.recursion_level = 2
+    WHERE lp.recursion_level <= 2
+)
+SELECT 
+    department_name,
+    location_path
+FROM LocationPath
+WHERE recursion_level = 3
+  AND (location_path LIKE 'Americas%' OR location_path LIKE 'Europe%')
+ORDER BY department_name, location_path;
+```
+
+*Expected Results*:
+|===
+|department_name|location_path
+|Accounting|Americas → United States → Seattle
+|Administration|Americas → United States → Seattle
+|===
+
+== Query 17: Employees with High Commission Impact
+
+*Description*: Identifies employees in sales roles whose commission significantly boosts their total compensation (commission ≥ 30% of salary).
+
+*Purpose*: To highlight employees heavily reliant on commission-based earnings.
+
+*SQL*:
+```sql
+SELECT 
+    e.first_name || ' ' || e.last_name AS employee_name,
+    j.job_title,
+    e.salary,
+    e.commission_pct,
+    e.salary * e.commission_pct AS commission_amount,
+    ROUND((e.salary * e.commission_pct / e.salary * 100), 2) AS commission_percentage
+FROM employees e
+JOIN jobs j ON e.job_id = j.job_id
+WHERE e.commission_pct IS NOT NULL
+AND e.salary * e.commission_pct >= 0.3 * e.salary
+ORDER BY commission_percentage DESC;
+```
+
+*Expected Results*:
+|===
+|employee_name|job_title|salary|commission_pct|commission_amount|commission_percentage
+|John Singh|Sales Manager|14000|0.4|5600|40
+|Janette King|Sales Representative|10000|0.35|3500|35
+|===
+
+== Query 18: Job Role Transition Matrix
+
+*Description*: Creates a matrix of job role transitions, showing how many employees moved from one job role to another based on job_history.
+
+*Purpose*: To analyze common career paths within the organization.
+
+*SQL*:
+```sql
+WITH JobTransitions AS (
+    SELECT 
+        jh.employee_id,
+        LAG(jh.job_id) OVER (PARTITION BY jh.employee_id ORDER BY jh.start_date) AS from_job_id,
+        jh.job_id AS to_job_id
+    FROM job_history jh
+)
+SELECT 
+    j1.job_title AS from_job,
+    j2.job_title AS to_job,
+    COUNT(*) AS transition_count
+FROM JobTransitions jt
+JOIN jobs j1 ON jt.from_job_id = j1.job_id
+JOIN jobs j2 ON jt.to_job_id = j2.job_id
+WHERE jt.from_job_id IS NOT NULL
+GROUP BY j1.job_title, j2.job_title
+ORDER BY transition_count DESC;
+```
+
+*Expected Results*:
+|===
+|from_job|to_job|transition_count
+|Public Accountant|Accounting Manager|1
+|Sales Representative|Sales Manager|1
+|===
+
+== Query 19: Departments with Diverse Job Roles
+
+*Description*: Identifies departments with the most diverse set of job roles, based on the number of unique job titles.
+
+*Purpose*: To assess job role variety within departments.
+
+*SQL*:
+```sql
+SELECT 
+    d.department_name,
+    COUNT(DISTINCT e.job_id) AS unique_job_count,
+    LISTAGG(j.job_title, ', ') WITHIN GROUP (ORDER BY j.job_title) AS job_titles
+FROM employees e
+JOIN departments d ON e.department_id = d.department_id
+JOIN jobs j ON e.job_id = j.job_id
+GROUP BY d.department_name
+HAVING COUNT(DISTINCT e.job_id) > 1
+ORDER BY unique_job_count DESC;
+```
+
+*Expected Results*:
+|===
+|department_name|unique_job_count|job_titles
+|Shipping|3|Shipping Clerk, Stock Clerk, Stock Manager
+|Sales|2|Sales Manager, Sales Representative
+|===
+
+== Query 20: Employee Workload by Manager
+
+*Description*: Estimates manager workload by counting the number of direct reports and their total salary, using a correlated subquery.
+
+*Purpose*: To assess managerial responsibilities and resource allocation.
+
+*SQL*:
+```sql
+SELECT 
+    m.first_name || ' ' || m.last_name AS manager_name,
+    d.department_name,
+    (SELECT COUNT(*) 
+     FROM employees e 
+     WHERE e.manager_id = m.employee_id) AS direct_reports,
+    (SELECT SUM(salary) 
+     FROM employees e 
+     WHERE e.manager_id = m.employee_id) AS total_team_salary
+FROM employees m
+JOIN departments d ON m.department_id = d.department_id
+WHERE EXISTS (
+    SELECT 1 
+    FROM employees e 
+    WHERE e.manager_id = m.employee_id
+)
+ORDER BY direct_reports DESC, total_team_salary DESC;
+```
+
+*Expected Results*:
+|===
+|manager_name|department_name|direct_reports|total_team_salary
+|Steven King|Executive|12|101200
+|Lex Garcia|Executive|6|37800
+|===
+
+= Oracle SQL Insert Queries for HR Schema
+
+
+== Query 1: Add a New Region
+
+*Description*: Inserts a new region into the `regions` table to support expansion into a new geographic area.
+
+*Purpose*: To create a new region for future country and location assignments.
+
+*SQL*:
+```sql
+INSERT INTO regions (region_id, region_name)
+VALUES (60, 'Antarctica');
+```
+
+*Expected Results*:
+|===
+|region_id|region_name
+|60|Antarctica
+|===
+
+== Query 2: Add a New Country
+
+*Description*: Inserts a new country into the `countries` table, linked to an existing region.
+
+*Purpose*: To expand the list of countries for location assignments.
+
+*SQL*:
+```sql
+INSERT INTO countries (country_id, country_name, region_id)
+VALUES ('NZ', 'New Zealand', 40);
+```
+
+*Expected Results*:
+|===
+|country_id|country_name|region_id
+|NZ|New Zealand|40
+|===
+
+== Query 3: Add a New Location
+
+*Description*: Inserts a new office location into the `locations` table, using the `locations_seq` sequence for the ID.
+
+*Purpose*: To establish a new office for a department.
+
+*SQL*:
+```sql
+INSERT INTO locations (location_id, street_address, postal_code, city, state_province, country_id)
+VALUES (locations_seq.NEXTVAL, '123 Queen Street', '1010', 'Auckland', NULL, 'NZ');
+```
+
+*Expected Results*:
+|===
+|location_id|street_address|postal_code|city|state_province|country_id
+|3300|123 Queen Street|1010|Auckland|NULL|NZ
+|===
+
+== Query 4: Add a New Department
+
+*Description*: Inserts a new department into the `departments` table, using the `departments_seq` sequence and linking to an existing location.
+
+*Purpose*: To create a new department for organizational expansion.
+
+*SQL*:
+```sql
+INSERT INTO departments (department_id, department_name, manager_id, location_id)
+VALUES (departments_seq.NEXTVAL, 'Data Science', NULL, 3300);
+```
+
+*Expected Results*:
+|===
+|department_id|department_name|manager_id|location_id
+|280|Data Science|NULL|3300
+|===
+
+== Query 5: Add a New Job Role
+
+*Description*: Inserts a new job role into the `jobs` table with a defined salary range.
+
+*Purpose*: To define a new position for hiring.
+
+*SQL*:
+```sql
+INSERT INTO jobs (job_id, job_title, min_salary, max_salary)
+VALUES ('DS_ANAL', 'Data Analyst', 6000, 12000);
+```
+
+*Expected Results*:
+|===
+|job_id|job_title|min_salary|max_salary
+|DS_ANAL|Data Analyst|6000|12000
+|===
+
+== Query 6: Add a New Employee
+
+*Description*: Inserts a new employee into the `employees` table, using the `employees_seq` sequence and assigning them to the new department and job.
+
+*Purpose*: To onboard a new employee.
+
+*SQL*:
+```sql
+INSERT INTO employees (employee_id, first_name, last_name, email, phone_number, hire_date, job_id, salary, commission_pct, manager_id, department_id)
+VALUES (employees_seq.NEXTVAL, 'Emma', 'Taylor', 'ETAYLOR', '64.9.555.0123', TO_DATE('11-06-2025', 'dd-MM-yyyy'), 'DS_ANAL', 8000, NULL, NULL, 280);
+```
+
+*Expected Results*:
+|===
+|employee_id|first_name|last_name|email|phone_number|hire_date|job_id|salary|commission_pct|manager_id|department_id
+|207|Emma|Taylor|ETAYLOR|64.9.555.0123|2025-06-11|DS_ANAL|8000|NULL|NULL|280
+|===
+
+== Query 7: Add a New Manager to a Department
+
+*Description*: Inserts a new employee as a manager into the `employees` table and updates the `departments` table to assign them as the manager of the Data Science department.
+
+*Purpose*: To assign a manager to a new department.
+
+*SQL*:
+```sql
+INSERT INTO employees (employee_id, first_name, last_name, email, phone_number, hire_date, job_id, salary, commission_pct, manager_id, department_id)
+VALUES (employees_seq.NEXTVAL, 'Liam', 'Chen', 'LCHEN', '64.9.555.0124', TO_DATE('11-06-2025', 'dd-MM-yyyy'), 'DS_ANAL', 10000, NULL, NULL, 280);
+
+UPDATE departments
+SET manager_id = employees_seq.CURRVAL
+WHERE department_id = 280;
+```
+
+*Expected Results* (from `employees` and `departments`):
+|===
+|table_name|employee_id/department_id|first_name/department_name|last_name/manager_id
+|employees|208|Liam|Chen
+|departments|280|Data Science|208
+|===
+
+== Query 8: Add Job History for an Employee
+
+*Description*: Inserts a job history record for an existing employee who transitioned to a new role.
+
+*Purpose*: To document a role change for an employee.
+
+*SQL*:
+```sql
+INSERT INTO job_history (employee_id, start_date, end_date, job_id, department_id)
+VALUES (100, TO_DATE('17-06-2013', 'dd-MM-yyyy'), TO_DATE('10-06-2025', 'dd-MM-yyyy'), 'AD_PRES', 90);
+```
+
+*Expected Results*:
+|===
+|employee_id|start_date|end_date|job_id|department_id|
+|100|2013-06-17|2025-06-10|AD_PRES|90
+|===
+
+== Query 9: Add Multiple Employees in Bulk
+
+*Description*: Inserts multiple employees into the `employees` table using a single INSERT statement with SELECT to support bulk hiring.
+
+*Purpose*: To efficiently onboard multiple employees to a department.
+
+*SQL**:
+```sql
+INSERT INTO employees (employee_id, first_name, last_name, email, phone_number, hire_date, job_id, salary, commission_pct, manager_id, department_id)
+SELECT 
+    employees_seq.NEXTVAL,
+    first_name,
+    last_name,
+    UPPER(SUBSTR(first_name, 1, 1) || last_name) AS email,
+    phone_number,
+    TO_DATE('12-06-2025', 'dd-MM-yyyy'),
+    'DS_ANAL',
+    salary,
+    NULL,
+    208,
+    280
+FROM (
+    SELECT 'Sophie' AS first_name, 'Brown' AS last_name, '64.9.555.0125' AS phone_number, 7500 AS salary FROM dual
+    UNION ALL
+    SELECT 'Noah', 'Wilson', '64.9.555.0126', 7800 FROM dual
+);
+```
+
+*Expected Results*:
+|===
+|employee_id|first_name|last_name|email|phone_number|hire_date|job_id|salary|commission_pct|manager_id|department_id
+|209|Sophie|Brown|SBROWN|64.9.555.0125|2025-06-12|DS_ANAL|7500|NULL|208|280
+|210|Noah|Wilson|NWILSON|64.9.555.0126|2025-06-12|DS_ANAL|7800|NULL|208|280
+|===
+
+== Query 10: Add a New Location and Department Simultaneously
+
+*Description*: Inserts a new location and a new department in a single transaction, ensuring referential integrity.
+
+*Purpose*: To set up a new office and department as part of regional expansion.
+
+*SQL*:
+```sql
+BEGIN
+    INSERT INTO locations (location_id, street_address, postal_code, city, state_province, country_id)
+    VALUES (locations_seq.NEXTVAL, '45 Victoria Road', '6011', 'Wellington', NULL, 'NZ');
+    
+    INSERT INTO departments (department_id, department_name, manager_id, location_id)
+    VALUES (departments_seq.NEXTVAL, 'AI Research', NULL, locations_seq.CURRVAL);
+END;
+/
+```
+
+*Expected Results* (from `locations` and `departments`):
+|===
+|table_name|location_id/department_id|street_address/department_name|city/manager_id
+|locations|340
