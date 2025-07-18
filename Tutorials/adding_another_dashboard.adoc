@@ -1,0 +1,242 @@
+= Adding a Manager Performance Dashboard to Your Spring Boot App
+
+This tutorial will guide you through adding an "Employee Salary Growth Under Managers" dashboard to the Spring Boot HR Management Demo. This dashboard will help visualize how the average salary of a manager's team compares to the overall department average, providing insights into manager impact on compensation.
+
+== Understanding the Query-to-Code Connection
+
+Just like with the previous dashboard, we will be taking a native SQL query and integrating it directly into our Spring Boot application. The application leverages the Spring Data JPA module to make this a clean and straightforward process.
+
+Here’s the workflow:
+
+1.  **The SQL Query**: We start with the "Employee Salary Growth Under Managers" query, which calculates and compares team and department salary averages.
+
+2.  **The `@Query` Annotation in the Repository**: The SQL query is embedded within a `@Query` annotation in the `EmployeeRepository.java` interface. We associate this query with a new method, `findManagerSalaryImpactRaw()`.
+
+3.  **The DTO (Data Transfer Object)**: We'll create a `ManagerSalaryImpactDTO.java` class. This object acts as a structured container for the data that our SQL query returns. It makes the data easier to work with in our Java code.
+
+4.  **The Controller**: The `AnalyticsController.java` will have a new method that is executed when a user navigates to the `/analytics/manager-salary-impact` URL. This method calls our new repository method, takes the raw results, and maps them to our `ManagerSalaryImpactDTO` objects.
+
+5.  **The View**: The controller then passes the list of DTOs to a new Thymeleaf view (`manager-salary-impact.html`), which is responsible for rendering the data as an HTML table for the user.
+
+By following this pattern, we keep our SQL logic cleanly defined in the repository, our data structures defined in DTOs, and our application logic in the controller.
+
+---
+
+== Step-by-Step Guide
+
+Here are the steps to add the new dashboard.
+
+=== Step 1: Create the DTO
+
+First, create a new file named `ManagerSalaryImpactDTO.java` in the `src/main/java/com/example/hr/backend_springboot/dto/` directory.
+
+[source,java]
+----
+package com.example.hr.backend_springboot.dto;
+
+import java.math.BigDecimal;
+
+public class ManagerSalaryImpactDTO {
+    private String managerName;
+    private String departmentName;
+    private BigDecimal avgTeamSalary;
+    private BigDecimal deptAvgSalary;
+    private BigDecimal pctDiff;
+
+    public ManagerSalaryImpactDTO(String managerName, String departmentName, BigDecimal avgTeamSalary, BigDecimal deptAvgSalary, BigDecimal pctDiff) {
+        this.managerName = managerName;
+        this.departmentName = departmentName;
+        this.avgTeamSalary = avgTeamSalary;
+        this.deptAvgSalary = deptAvgSalary;
+        this.pctDiff = pctDiff;
+    }
+
+    // Getters and Setters...
+}
+----
+
+=== Step 2: Update the Employee Repository
+
+Next, add the "Employee Salary Growth Under Managers" query to the `EmployeeRepository.java` interface.
+
+[source,java]
+----
+package com.example.hr.backend_springboot.repository;
+
+import com.example.hr.backend_springboot.model.Employee;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import java.util.List;
+
+public interface EmployeeRepository extends JpaRepository<Employee, Long> {
+
+    // ... (other existing queries)
+
+    // Query 6: Employee Salary Growth Under Managers
+    @Query(value = "WITH ManagerStats AS (\n" +
+            "    SELECT \n" +
+            "        m.employee_id AS manager_id,\n" +
+            "        m.first_name || ' ' || m.last_name AS manager_name,\n" +
+            "        d.department_name,\n" +
+            "        AVG(e.salary) AS avg_team_salary,\n" +
+            "        (SELECT AVG(salary) FROM employees WHERE department_id = d.department_id) AS dept_avg_salary\n" +
+            "    FROM employees e\n" +
+            "    JOIN employees m ON e.manager_id = m.employee_id\n" +
+            "    JOIN departments d ON e.department_id = d.department_id\n" +
+            "    GROUP BY m.employee_id, m.first_name, m.last_name, d.department_name, d.department_id\n" +
+            ")\n" +
+            "SELECT \n" +
+            "    manager_name,\n" +
+            "    department_name,\n" +
+            "    ROUND(avg_team_salary, 2) AS avg_team_salary,\n" +
+            "    ROUND(dept_avg_salary, 2) AS dept_avg_salary,\n" +
+            "    ROUND(((avg_team_salary - dept_avg_salary) / dept_avg_salary * 100), 2) AS pct_diff\n" +
+            "FROM ManagerStats\n" +
+            "WHERE avg_team_salary IS NOT NULL\n" +
+            "ORDER BY department_name, pct_diff DESC",
+            nativeQuery = true)
+    List<Object[]> findManagerSalaryImpactRaw();
+}
+----
+
+=== Step 3: Update the Analytics Controller
+
+Add a new method to `AnalyticsController.java` to handle the request for this dashboard.
+
+[source,java]
+----
+package com.example.hr.backend_springboot.controller;
+
+import com.example.hr.backend_springboot.dto.*;
+import com.example.hr.backend_springboot.repository.EmployeeRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+
+@Controller
+public class AnalyticsController {
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    // ... (other existing GET mappings)
+
+    @GetMapping("/analytics/manager-salary-impact")
+    public String managerSalaryImpact(Model model) {
+        List<Object[]> rawResults = employeeRepository.findManagerSalaryImpactRaw();
+        List<ManagerSalaryImpactDTO> managerData = new ArrayList<>();
+        for (Object[] row : rawResults) {
+            managerData.add(new ManagerSalaryImpactDTO(
+                (String) row[0],
+                (String) row[1],
+                (BigDecimal) row[2],
+                (BigDecimal) row[3],
+                (BigDecimal) row[4]
+            ));
+        }
+        model.addAttribute("managerData", managerData);
+        return "analytics/manager-salary-impact";
+    }
+}
+----
+
+=== Step 4: Create the HTML View
+
+Create a new Thymeleaf template named `manager-salary-impact.html` in the `src/main/resources/templates/analytics/` directory.
+
+[source,html]
+----
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Manager Salary Impact</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="/analytics/dashboard">
+                    <i class="fas fa-chart-line me-2"></i>HR Analytics
+                </a>
+                <div class="navbar-nav ms-auto">
+                    <a class="nav-link" href="/analytics/dashboard">Dashboard</a>
+                    <a class="nav-link active" href="/analytics/manager-salary-impact">Manager Impact</a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="fas fa-user-tie text-info me-2"></i>Manager Salary Impact</h1>
+                <a href="/analytics/dashboard" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                </a>
+            </div>
+
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                This report compares the average salary of each manager's team to the overall average salary of their department.
+            </div>
+
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-table me-2"></i>Manager Compensation Analysis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Manager Name</th>
+                                    <th>Department</th>
+                                    <th>Avg. Team Salary</th>
+                                    <th>Dept. Avg. Salary</th>
+                                    <th>Difference (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="manager : ${managerData}">
+                                    <td th:text="${manager.managerName}"></td>
+                                    <td th:text="${manager.departmentName}"></td>
+                                    <td th:text="${'$' + #numbers.formatDecimal(manager.avgTeamSalary, 1, 2)}"></td>
+                                    <td th:text="${'$' + #numbers.formatDecimal(manager.deptAvgSalary, 1, 2)}"></td>
+                                    <td>
+                                        <span th:text="${#numbers.formatDecimal(manager.pctDiff, 1, 2) + '%'}"
+                                              th:class="${manager.pctDiff.doubleValue() > 0 ? 'text-success' : 'text-danger'}">
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+----
+
+=== Step 5: Update the Analytics Dashboard
+
+Finally, add a link to the new report on the main analytics dashboard.
+
+Open `src/main/resources/templates/analytics/dashboard.html` and add the following line to the "Career & Management" card:
+
+[source,html]
+----
+<li><a href="/analytics/manager-salary-impact" class="text-decoration-none">
+    <i class="fas fa-chart-area text-info me-2"></i>Manager Salary Impact
+</a></li>
+----
+
+Now you can rebuild and run your application to see the new dashboard in action!
